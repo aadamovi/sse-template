@@ -2,42 +2,40 @@ package com.sseevents.template.controller;
 
 import com.sseevents.template.service.SseEmitterService;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import java.util.List;
 
-@WebMvcTest(SseEmitterController.class)
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.CoreMatchers.is;
+
+@WebFluxTest(SseEmitterController.class)
 class SseEmitterControllerTest {
 
     @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webClient;
 
     @MockBean
     private SseEmitterService dataSetService;
 
     @Test
-    public void shouldEmitEvents() throws Exception {
-        MvcResult mvcResult = mockMvc.perform(get("/emitter"))
-                .andExpect(request().asyncStarted())
-                .andDo(MockMvcResultHandlers.log())
-                .andReturn();
+    public void shouldEmitFluxSse() {
+        List<String> res = webClient.get()
+                .uri("/emitter")
+                .accept(MediaType.valueOf(MediaType.TEXT_EVENT_STREAM_VALUE))
+                .exchange()
+                .returnResult(String.class)
+                .getResponseBody()
+                .take(3) // take 3 comment objects
+                .collectList()
+                .block();
 
-        mockMvc.perform(asyncDispatch(mvcResult))
-                .andDo(MockMvcResultHandlers.log())
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("text/event-stream"));
-
-        String event = mvcResult.getResponse().getContentAsString();
-        System.out.println(event);
+        assertThat(res, notNullValue());
+        assertThat(res.size(), is(3));
     }
-
 }
